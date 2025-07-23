@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TrendBlend</title>
+    <style>
+        body {
+            background-image: url('images/background.png');
+            background-size: cover;
+            background-repeat: no-repeat;
+            background-position: center;
+            color: #fff;
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        .header {
+            width: 100%;
+            text-align: center;
+            padding: 30px 0;
+            background-color: rgba(0, 0, 0, 0.6);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.7);
+        }
+
+        .header h1 {
+            font-size: 3.5rem;
+            color: #ff6347;
+            margin: 0;
+            font-family: 'Trebuchet MS', sans-serif;
+            text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.7);
+            text-transform: uppercase;
+        }
+
+        .main-container {
+            display: flex;
+            width: 90%;
+            max-width: 1200px;
+            height: 70%;
+            justify-content: space-evenly;
+            align-items: center;
+            margin-top: 50px;
+        }
+
+        .option {
+            flex: 1;
+            margin: 15px;
+            background-color: rgba(0, 0, 0, 0.7);
+            border-radius: 20px;
+            padding: 50px;
+            box-shadow: 0 10px 30px rgba(255, 255, 255, 0.3);
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            transition: transform 0.3s, box-shadow 0.3s;
+            backdrop-filter: blur(5px);
+            height: 100%;
+            
+        }
+
+        .option:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 15px 40px rgba(255, 255, 255, 0.5);
+        }
+
+        .option h2 {
+            font-size: 2.5rem;
+            color: #ff9900;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+
+        .option i {
+            font-size: 4rem;
+            color: #ff6347;
+            margin-bottom: 20px;
+        }
+
+        form {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.8);
+            background-color: rgba(20, 20, 20, 0.9);
+            padding: 30px;
+            border-radius: 20px;
+            width: 400px;
+            box-shadow: 0 10px 30px rgba(255, 255, 255, 0.3);
+            z-index: 3;
+        }
+
+        form.active {
+            display: block;
+            animation: fadeIn 0.5s ease-in-out forwards;
+        }
+
+        form h2 {
+            color: #ff6347;
+            margin-bottom: 15px;
+        }
+
+        form label {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+
+        form textarea,
+        form input {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 20px;
+            border: none;
+            border-radius: 10px;
+            background-color: #333;
+            color: #fff;
+            font-size: 1.1rem;
+        }
+
+        form button {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 10px;
+            background-color: #ff4500;
+            color: #fff;
+            font-size: 1.2rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        form button:hover {
+            background-color: #ff6347;
+        }
+
+
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 2;
+        }
+
+        .modal-overlay.active {
+            display: block;
+        }
+
+   
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        @keyframes fadeInAndScale {
+            0% {
+                opacity: 0;
+                transform: translate(-50%, -50%) scale(0.8);
+            }
+
+            100% {
+                opacity: 1;
+                transform: translate(-50%, -50%) scale(1);
+            }
+        }
+
+        #recommendations {
+            display: flex;
+            flex-wrap: wrap;
+            margin-top: 20px;
+            justify-content: center;
+        }
+
+        #recommendations img {
+            width: 200px;
+            margin: 10px;
+            border-radius: 10px;
+            transition: transform 0.3s;
+        }
+
+        #recommendations img:hover {
+            transform: scale(1.1);
+        }
+    </style>
+    <script>
+        function showForm(formId) {
+            const forms = document.querySelectorAll("form");
+            forms.forEach(form => form.classList.remove("active"));
+            const mainContainer = document.querySelector('.main-container');
+            mainContainer.style.pointerEvents = 'none';
+            document.getElementById(formId).classList.add("active");
+            document.querySelector('.modal-overlay').classList.add("active");
+        }
+
+        function hideForm() {
+            const forms = document.querySelectorAll("form");
+            forms.forEach(form => form.classList.remove("active"));
+            document.querySelector('.modal-overlay').classList.remove("active");
+            const mainContainer = document.querySelector('.main-container');
+            mainContainer.style.pointerEvents = 'auto';
+        }
+
+
+        function handleDescriptionValidation(event) {
+            const descriptionInput = document.getElementById('description');
+            const description = descriptionInput.value.trim();
+
+            if (!description) {
+                alert('Description cannot be empty. Please enter a valid description.');
+                return false;
+            }
+
+            handleDescriptionSubmit(event);
+            return false;
+        }
+
+        async function handleDescriptionSubmit(event) {
+            event.preventDefault();
+
+            const description = document.getElementById('description').value.trim();
+            const gender = document.getElementById('gender').value;
+            const masterCategory = document.getElementById('masterCategory').value;
+
+            if (!description) {
+                alert('Description cannot be empty.');
+                return;
+            }
+
+            try {
+                const response = await fetch('/recommendationbyDescp', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        description: description,
+                        gender: gender || null,
+                        masterCategory: masterCategory || null
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data && Array.isArray(data)) {
+                    sessionStorage.setItem('recommendations', JSON.stringify(data));
+                    window.location.href = '/show-recommendations';
+                } else {
+                    alert('Error: ' + (data.error || 'Unable to fetch recommendations.'));
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+    </script>
+
+</head>
+
+<body>
+
+    <div class="header">
+        <h1>TrendBlend</h1>
+    </div>
+
+
+    <div class="modal-overlay" onclick="hideForm()"></div>
+
+    <div class="main-container">
+
+        <div class="option" onclick="showForm('description-form')">
+            <h2>🔍 Description-Based</h2>
+            <p>Provide a detailed description to find matching products.</p>
+        </div>
+
+    </div>
+
+    <form id="description-form" onsubmit="return handleDescriptionValidation(event)">
+        <h2>Description-Based Recommendation</h2>
+
+        <label for="description">Enter product description:</label>
+        <textarea id="description" name="description" rows="4" placeholder="Type your description here..."
+            required></textarea>
+
+        <label for="gender">Select Gender:</label>
+        <select id="gender" name="gender">
+            <option value="">All</option>
+            <option value="Boys">Boys</option>
+            <option value="Girls">Girls</option>
+            <option value="Men">Men</option>
+            <option value="Unisex">Unisex</option>
+            <option value="Women">Women</option>
+        </select>
+
+        <label for="masterCategory">Select Category:</label>
+        <select id="masterCategory" name="masterCategory">
+            <option value="">All</option>
+            <option value="Accessories">Accessories</option>
+            <option value="Apparel">Apparel</option>
+            <option value="Footwear">Footwear</option>
+            <option value="Free Items">Free Items</option>
+            <option value="Home">Home</option>
+            <option value="Personal Care">Personal Care</option>
+            <option value="Sporting Goods">Sporting Goods</option>
+        </select>
+
+        <button type="submit">🔍 Recommend</button>
+    </form>
+
+</body>
+
+</html>

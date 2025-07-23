@@ -1,0 +1,5 @@
+.env
+export_git_files.py
+__pycache__/
+*.pyc
+git_files_export.txt
