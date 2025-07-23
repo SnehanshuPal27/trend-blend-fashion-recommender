@@ -3,3 +3,7 @@ export_git_files.py
 __pycache__/
 *.pyc
 git_files_export.txt
+export_git_files.py
+ranker_model.py
+fashion_data_bert_faiss.pkl
+fashion_faiss.index

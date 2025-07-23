@@ -7,6 +7,7 @@ app = Flask(__name__)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
 # Load all the ML models and data once on startup
+# This happens when the Gunicorn server starts the application.
 with app.app_context():
     load_artifacts()
 
@@ -51,6 +52,3 @@ def recommend():
     except Exception as e:
         logging.error(f"An error occurred in /recommend: {e}", exc_info=True)
         return jsonify({'error': 'An internal server error occurred.'}), 500
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)

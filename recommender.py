@@ -4,50 +4,70 @@ import numpy as np
 import pandas as pd
 from sentence_transformers import SentenceTransformer
 import logging
+import os
+from google.cloud import storage
+
+# --- Configuration ---
+BUCKET_NAME = 'fashion-recommender-models' # <--- IMPORTANT: CHANGE TO YOUR BUCKET NAME
+MODEL_FILES = {
+    "data": "fashion_data_bert_faiss.pkl",
+    "index": "fashion_faiss.index",
+    "ranker": "ranker_model.pkl"
+}
+LOCAL_MODEL_PATH = "/app/models" # A directory inside the container
 
 # --- Global variables to hold loaded models and data ---
-# This prevents reloading on every request, which is crucial for performance.
 artifacts = {}
+
+def download_blob(bucket_name, source_blob_name, destination_file_name):
+    """Downloads a blob from the bucket."""
+    if os.path.exists(destination_file_name):
+        logging.info(f"File {destination_file_name} already exists. Skipping download.")
+        return
+    
+    logging.info(f"Downloading {source_blob_name} from bucket {bucket_name} to {destination_file_name}...")
+    storage_client = storage.Client()
+    bucket = storage_client.bucket(bucket_name)
+    blob = bucket.blob(source_blob_name)
+    
+    os.makedirs(os.path.dirname(destination_file_name), exist_ok=True)
+    blob.download_to_filename(destination_file_name)
+    logging.info(f"Downloaded {source_blob_name} successfully.")
+
 
 def load_artifacts():
     """
-    Loads all necessary artifacts (models, data, index) into memory.
-    This function should be called once when the Flask app starts.
+    Downloads models from GCS if they don't exist locally,
+    then loads all artifacts into memory.
     """
     global artifacts
-    if not artifacts: # Only load if they haven't been loaded yet
-        logging.info("Loading recommendation artifacts for the first time...")
-        
+    if not artifacts:
+        logging.info("Loading recommendation artifacts...")
+
+        # Download all model files from GCS
+        for key, filename in MODEL_FILES.items():
+            download_blob(BUCKET_NAME, filename, os.path.join(LOCAL_MODEL_PATH, filename))
+
         # Load the main data file
-        with open("fashion_data_bert_faiss.pkl", "rb") as f:
+        with open(os.path.join(LOCAL_MODEL_PATH, MODEL_FILES["data"]), "rb") as f:
             data = pickle.load(f)
             artifacts['products_df'] = data['data']
 
         # Load the Faiss index
-        artifacts['faiss_index'] = faiss.read_index("fashion_faiss.index")
+        artifacts['faiss_index'] = faiss.read_index(os.path.join(LOCAL_MODEL_PATH, MODEL_FILES["index"]))
 
         # Load the trained LightGBM ranker model
-        with open("ranker_model.pkl", "rb") as f:
+        with open(os.path.join(LOCAL_MODEL_PATH, MODEL_FILES["ranker"]), "rb") as f:
             artifacts['ranker_model'] = pickle.load(f)
 
-        # Load the SentenceTransformer model for encoding text
+        # Load the SentenceTransformer model
         artifacts['st_model'] = SentenceTransformer('all-MiniLM-L6-v2')
         
         logging.info("✅ All artifacts loaded successfully.")
 
+# The rest of your recommender.py file remains the same...
 def get_recommendations(description: str, gender_filter: str = None, category_filter: str = None, num_results: int = 8):
-    """
-    Performs the full two-stage recommendation.
-    
-    Args:
-        description (str): The user's text description of the desired product.
-        gender_filter (str, optional): A gender to filter by.
-        category_filter (str, optional): A master category to filter by.
-        num_results (int, optional): The final number of recommendations to return.
-
-    Returns:
-        list: A list of dictionaries, where each dictionary represents a recommended product.
-    """
+    # ... (no changes needed in this function)
     if not artifacts:
         load_artifacts()
 
@@ -57,7 +77,6 @@ def get_recommendations(description: str, gender_filter: str = None, category_fi
     ranker_model = artifacts['ranker_model']
 
     # --- STAGE 1: RETRIEVAL ---
-    # Retrieve a large number of candidates for the ranker to process.
     num_candidates = 100
     
     logging.info(f"Retrieving {num_candidates} candidates for description: '{description}'")
@@ -65,9 +84,9 @@ def get_recommendations(description: str, gender_filter: str = None, category_fi
     distances, indices = faiss_index.search(query_embedding, k=num_candidates)
 
     candidate_df = products_df.iloc[indices[0]].copy()
-    candidate_df['retrieval_score'] = 1 - (distances[0]**2 / 2) # Convert L2 distance to cosine similarity
+    candidate_df['retrieval_score'] = 1 - (distances[0]**2 / 2)
 
-    # --- Filtering (Optional) ---
+    # --- Filtering ---
     if gender_filter:
         candidate_df = candidate_df[candidate_df['gender'].str.lower() == gender_filter.lower()]
     if category_filter:
@@ -80,14 +99,11 @@ def get_recommendations(description: str, gender_filter: str = None, category_fi
     # --- STAGE 2: RANKING ---
     logging.info(f"Ranking {len(candidate_df)} candidates...")
     
-    # Prepare features for the ranker model
     features_for_ranking = candidate_df[['retrieval_score', 'price']]
     
-    # Predict a new, more accurate score using the ranker
     ranking_scores = ranker_model.predict_proba(features_for_ranking)[:, 1]
     candidate_df['ranking_score'] = ranking_scores
     
-    # Sort by the new ranking score and select the top results
     final_recommendations = candidate_df.sort_values('ranking_score', ascending=False).head(num_results)
 
     logging.info(f"Returning {len(final_recommendations)} final recommendations.")
