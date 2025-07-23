@@ -28,7 +28,7 @@ jobs:
         id: auth # Give this step an ID
         uses: 'google-github-actions/auth@v1'
         with:
-          credentials_json: '${{ secrets.GCP_SA_KEY }}'
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
 
       # --- NEW DEBUGGING STEP ---
       # This step will run right after authentication to verify which account is active.
