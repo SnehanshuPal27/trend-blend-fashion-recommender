@@ -7,11 +7,10 @@ on:
 
 env:
   PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-  # The name of your Artifact Registry repository
-  REPOSITORY: "fashion-recommender-repo" 
+  REPOSITORY: "fashion-recommender-repo"
   SERVICE_NAME: "trendblend-service"
   REGION: "asia-south2"
-  BUCKET_NAME: "fashion-recommender-models" 
+  BUCKET_NAME: "fashion-recommender-models"
 
 jobs:
   deploy:
@@ -24,18 +23,20 @@ jobs:
 
       - name: Authenticate to Google Cloud
         id: auth
-        uses: 'google-github-actions/auth@v2' 
+        uses: 'google-github-actions/auth@v2'
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
-      - name: 'Debug: Display Authenticated User'
-        run: |-
-          echo "--- Verifying Authentication ---"
-          gcloud auth list
-          echo "-----------------------------"
-
       - name: Set up Cloud SDK
         uses: 'google-github-actions/setup-gcloud@v2'
+
+      # --- NEW STEP TO ENABLE APIS ---
+      # This step ensures that the necessary APIs are enabled for the project.
+      - name: Enable necessary Google Cloud services
+        run: |-
+          gcloud services enable cloudbuild.googleapis.com
+          gcloud services enable artifactregistry.googleapis.com
+          gcloud services enable run.googleapis.com
 
       - name: Configure Docker for Artifact Registry
         run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
@@ -59,4 +60,16 @@ jobs:
             --memory=2Gi \
             --cpu=2 \
             --set-env-vars="BUCKET_NAME=${{ env.BUCKET_NAME }}"
-
+            
+      # --- NEW STEP TO CLEAN UP OLD ARTIFACTS ---
+      # This step runs only on successful deployment and deletes all images that are not tagged.
+      # Cloud Run untags previous revisions, making them eligible for deletion.
+      - name: Clean up old container images
+        if: success()
+        run: |-
+          echo "Cleaning up old, untagged images..."
+          gcloud artifacts docker images delete \
+            "${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE_NAME }}" \
+            --filter='-tags:*' \
+            --delete-tags \
+            --quiet
