@@ -1,6 +1,3 @@
-# .github/workflows/deploy.yml
-# This workflow builds and deploys the application to Google Cloud Run
-
 name: Deploy to Google Cloud Run
 
 on:
@@ -10,10 +7,11 @@ on:
 
 env:
   PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-  GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
-  BUCKET_NAME: "fashion-recommender-models" # IMPORTANT: Change to your bucket name
-  REGION: "asia-south2"
+  # The name of your Artifact Registry repository
+  REPOSITORY: "fashion-recommender-repo" 
   SERVICE_NAME: "trendblend-service"
+  REGION: "asia-south2"
+  BUCKET_NAME: "fashion-recommender-models" 
 
 jobs:
   deploy:
@@ -22,47 +20,43 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Authenticate to Google Cloud
-        id: auth # Give this step an ID
-        uses: 'google-github-actions/auth@v1'
+        id: auth
+        uses: 'google-github-actions/auth@v2' 
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
-      # --- NEW DEBUGGING STEP ---
-      # This step will run right after authentication to verify which account is active.
-      - name: 'Debug: Display Authenticated User and Project'
+      - name: 'Debug: Display Authenticated User'
         run: |-
-          echo "-----------------------------------------------------"
-          echo "DEBUGGING AUTHENTICATION"
-          echo "-----------------------------------------------------"
-          echo "Step name: Authenticate to Google Cloud"
-          echo "Step output (credentials_file_path): ${{ steps.auth.outputs.credentials_file_path }}"
-          echo ""
-          echo "Running 'gcloud auth list' to see the active account:"
+          echo "--- Verifying Authentication ---"
           gcloud auth list
-          echo ""
-          echo "Running 'gcloud config list' to see the configured project:"
-          gcloud config list --format="value(core.project)"
-          echo "-----------------------------------------------------"
-      # --- END OF DEBUGGING STEP ---
+          echo "-----------------------------"
 
       - name: Set up Cloud SDK
-        uses: 'google-github-actions/setup-gcloud@v1'
+        uses: 'google-github-actions/setup-gcloud@v2'
 
-      - name: Build and Push Docker Image
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
+
+      - name: Build Docker Image
         run: |-
-          gcloud builds submit --tag "gcr.io/$PROJECT_ID/$SERVICE_NAME"
+          docker build -t "${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE_NAME }}:${{ github.sha }}" .
+
+      - name: Push Docker Image to Artifact Registry
+        run: |-
+          docker push "${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE_NAME }}:${{ github.sha }}"
 
       - name: Deploy to Cloud Run
         run: |-
-          gcloud run deploy $SERVICE_NAME \
-            --image="gcr.io/$PROJECT_ID/$SERVICE_NAME" \
-            --platform="managed" \
-            --region="$REGION" \
+          gcloud run deploy ${{ env.SERVICE_NAME }} \
+            --image="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE_NAME }}:${{ github.sha }}" \
+            --region=${{ env.REGION }} \
+            --platform=managed \
+            --allow-unauthenticated \
             --min-instances=1 \
             --memory=2Gi \
             --cpu=2 \
-            --allow-unauthenticated \
-            --set-env-vars="BUCKET_NAME=$BUCKET_NAME"
+            --set-env-vars="BUCKET_NAME=${{ env.BUCKET_NAME }}"
+
