@@ -5,3 +5,5 @@ faiss-cpu
 sentence-transformers
 lightgbm
 scikit-learn
+gunicorn
+google-cloud-storage

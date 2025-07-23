@@ -11,6 +11,8 @@ env:
   SERVICE_NAME: "trendblend-service"
   REGION: "asia-south2"
   BUCKET_NAME: "fashion-recommender-models"
+  # Define the service account email to be used for both deployment and runtime
+  SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SA_EMAIL }} 
 
 jobs:
   deploy:
@@ -30,8 +32,6 @@ jobs:
       - name: Set up Cloud SDK
         uses: 'google-github-actions/setup-gcloud@v2'
 
-      # --- NEW STEP TO ENABLE APIS ---
-      # This step ensures that the necessary APIs are enabled for the project.
       - name: Enable necessary Google Cloud services
         run: |-
           gcloud services enable cloudbuild.googleapis.com
@@ -59,11 +59,9 @@ jobs:
             --min-instances=1 \
             --memory=2Gi \
             --cpu=2 \
-            --set-env-vars="BUCKET_NAME=${{ env.BUCKET_NAME }}"
+            --set-env-vars="BUCKET_NAME=${{ env.BUCKET_NAME }}" \
+            --service-account=${{ env.SERVICE_ACCOUNT_EMAIL }} 
             
-      # --- NEW STEP TO CLEAN UP OLD ARTIFACTS ---
-      # This step runs only on successful deployment and deletes all images that are not tagged.
-      # Cloud Run untags previous revisions, making them eligible for deletion.
       - name: Clean up old container images
         if: success()
         run: |-
