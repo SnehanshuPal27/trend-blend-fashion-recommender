@@ -1,0 +1,7 @@
+flask
+pandas
+numpy
+faiss-cpu
+sentence-transformers
+lightgbm
+scikit-learn

@@ -1,133 +1,56 @@
-import os
 from flask import Flask, request, jsonify, render_template
-from newRec import preprocess_text, recommend_products
-import json
+import logging
+from recommender import load_artifacts, get_recommendations
 
-app = Flask(__name__, static_folder='images')
+# --- App Initialization ---
+app = Flask(__name__)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
+# Load all the ML models and data once on startup
+with app.app_context():
+    load_artifacts()
+
+# --- Routes ---
 
 @app.route('/')
 def index():
-    print('home')
-    return render_template('index.html')  
- 
+    """Renders the main search page."""
+    return render_template('index.html')
 
+@app.route('/results')
+def results():
+    """Renders the results page."""
+    return render_template('results.html')
 
-
-
-@app.route('/recommendationbyDescp', methods=['POST'])
-def recommendation_by_description():
+@app.route('/recommend', methods=['POST'])
+def recommend():
+    """
+    The main API endpoint for getting recommendations.
+    Accepts a JSON payload with a description and optional filters.
+    """
     try:
-        print("Raw request data:", request.data)
-        print("Request content type:", request.content_type)
-        print("Request headers:", dict(request.headers))
+        data = request.get_json()
+        description = data.get('description')
+        gender = data.get('gender')
+        category = data.get('category')
 
-        try:
-            
-            request_data = request.get_json(force=True)
-        except json.JSONDecodeError as je:
-            print(f"JSON parsing error. Raw data: {request.data.decode('utf-8')}")
-            raw_data = request.data.decode('utf-8').strip()
-            try:
-                request_data = json.loads(raw_data)
-            except json.JSONDecodeError:
-                return jsonify({
-                    'error': 'Invalid JSON format',
-                    'raw_data': raw_data,
-                    'details': str(je)
-                }), 400
+        if not description:
+            return jsonify({'error': 'Description is required.'}), 400
 
-        print("Parsed request data:", request_data)
-
-        
-        if not request_data or 'description' not in request_data:
-            print("Error: Invalid input, 'description' not in request data.")
-            return jsonify({
-                'error': 'Invalid input: Description is required',
-                'received_data': request_data
-            }), 400
-
-        user_description = request_data['description'].strip()
-        if not user_description:
-            print("Error: Description is empty.")
-            return jsonify({'error': 'Description cannot be empty'}), 400
-
-        
-        gender_filter = request_data.get('gender')
-        category_filter = request_data.get('masterCategory')
-
-        print("Processed description:", user_description)
-        print("Gender filter:", gender_filter if gender_filter else "None provided (defaulting to None)")
-        print("Category filter:", category_filter if category_filter else "None provided (defaulting to None)")
-
-        
-        processed_description = preprocess_text(user_description)
-
-        
-        precomputed_file = 'preprocessed_fashion_data.pkl'
-        output_file = 'recommendations.json'
-
-        
-        recommendations = recommend_products(
-            user_description=processed_description,
-            gender_filter=gender_filter if gender_filter else None,
-            category_filter=category_filter if category_filter else None,
-            precomputed_file=precomputed_file,
-            output_file=output_file,
-            num_recommendations=5
+        recommendations = get_recommendations(
+            description=description,
+            gender_filter=gender if gender != 'all' else None,
+            category_filter=category if category != 'all' else None
         )
-
         
         if not recommendations:
-            print("No recommendations found.")
-            return jsonify({'message': 'No recommendations found'}), 404
-
-        
+            return jsonify({'message': 'No matching products found.'}), 404
+            
         return jsonify(recommendations)
 
-    except json.JSONDecodeError as e:
-        print(f"JSON decoding error occurred. Request data: {request.data}")
-        return jsonify({
-            'error': 'JSON decoding error',
-            'details': str(e),
-            'raw_data': request.data.decode('utf-8') if request.data else None
-        }), 400
-
     except Exception as e:
-        print(f"Server error occurred. Error: {str(e)}")
-        print(f"Request data: {request.data}")
-        return jsonify({
-            'error': 'Server error',
-            'details': str(e),
-            'raw_data': request.data.decode('utf-8') if request.data else None
-        }), 500
-
-
-
-@app.route('/test-recommendation', methods=['POST'])
-def test_recommendation():
-    """Test endpoint to verify JSON parsing"""
-    try:
-        data = request.get_json(force=True)
-        return jsonify({
-            'received': data,
-            'status': 'success'
-        })
-    except Exception as e:
-        return jsonify({
-            'error': str(e),
-            'raw_data': request.data.decode('utf-8') if request.data else None
-        }), 400
-
-    
-@app.route('/show-recommendations')
-def show_recommendations():
-    """
-    Render the recommendations page.
-    """
-    return render_template('recommendText.html')
-
+        logging.error(f"An error occurred in /recommend: {e}", exc_info=True)
+        return jsonify({'error': 'An internal server error occurred.'}), 500
 
 if __name__ == '__main__':
-    
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=True)
