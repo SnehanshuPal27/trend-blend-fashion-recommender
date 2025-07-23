@@ -62,12 +62,20 @@ jobs:
             --set-env-vars="BUCKET_NAME=${{ env.BUCKET_NAME }}" \
             --service-account=${{ env.SERVICE_ACCOUNT_EMAIL }} 
             
+      # This step lists all image versions in the package that have no tags,
+      # then passes them to the delete command.
       - name: Clean up old container images
         if: success()
         run: |-
           echo "Cleaning up old, untagged images..."
-          gcloud artifacts docker images delete \
-            "${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE_NAME }}" \
-            --filter='-tags:*' \
-            --delete-tags \
+          gcloud artifacts versions list \
+            --repository="${{ env.REPOSITORY }}" \
+            --package="${{ env.SERVICE_NAME }}" \
+            --location="${{ env.REGION }}" \
+            --filter="-tags:*" \
+            --format="get(version)" \
+          | xargs -r -I {} gcloud artifacts versions delete {} \
+            --repository="${{ env.REPOSITORY }}" \
+            --package="${{ env.SERVICE_NAME }}" \
+            --location="${{ env.REGION }}" \
             --quiet

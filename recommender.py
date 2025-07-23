@@ -8,7 +8,7 @@ import os
 from google.cloud import storage
 
 # --- Configuration ---
-BUCKET_NAME = 'fashion-recommender-models' # <--- IMPORTANT: CHANGE TO YOUR BUCKET NAME
+BUCKET_NAME = 'fashion-recommender-models' 
 MODEL_FILES = {
     "data": "fashion_data_bert_faiss.pkl",
     "index": "fashion_faiss.index",
@@ -65,9 +65,7 @@ def load_artifacts():
         
         logging.info("✅ All artifacts loaded successfully.")
 
-# The rest of your recommender.py file remains the same...
 def get_recommendations(description: str, gender_filter: str = None, category_filter: str = None, num_results: int = 8):
-    # ... (no changes needed in this function)
     if not artifacts:
         load_artifacts()
 

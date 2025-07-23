@@ -16,5 +16,5 @@ COPY . .
 # Cloud Run expects the container to listen on this port
 ENV PORT=8080
 
-# Define the command to run your app using gunicorn, a production-grade server
+# Define the command to run the app using gunicorn
 CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "1", "--threads", "8", "--timeout", "0", "run:app"]
